@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: coupon-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/coupons}
+    username: ${DB_USER:coupons}
+    password: ${DB_PASSWORD:coupons}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # schema is owned by Flyway, Hibernate only verifies it
+
+server:
+  # Resolve the client address from X-Forwarded-For, but only when the request
+  # comes from a trusted proxy (see server.tomcat.remoteip.internal-proxies).
+  forward-headers-strategy: native
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+coupons:
+  geo:
+    base-url: http://ip-api.com          # primary provider (free tier: HTTP only, ~45 requests/min)
+    fallback-base-url: https://ipapi.co  # secondary provider, used when the primary fails
+    connect-timeout: 1s
+    read-timeout: 2s
+    cache-ttl: 1h
+    cache-max-size: 10000
+    # circuit breaker, applied per provider
+    failure-rate-threshold: 50           # % of failed calls that opens the circuit
+    sliding-window-size: 10
+    minimum-calls: 5
+    open-state-duration: 30s
+  outbox:
+    batch-size: 50
+    poll-interval: PT2S                  # ISO-8601, used by @Scheduled
+  idempotency:
+    in-progress-timeout: 60s             # a claim older than this is treated as abandoned
+    retention: 24h                       # stored responses are purged after this
+  rate-limit:
+    enabled: true
+    capacity: 30                         # burst size per client
+    refill-tokens: 30
+    refill-period: 1m                    # => sustained 30 redemption attempts / minute / client
+    max-tracked-clients: 100000
+  scheduling:
+    enabled: true
